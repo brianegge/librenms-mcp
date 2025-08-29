@@ -69,6 +69,9 @@ uv run python run_server.py
 
 # Or directly with Python
 python run_server.py
+
+# Or using the installed script
+librenms-mcp
 ```
 
 ### Development Setup
@@ -120,18 +123,6 @@ LOG_LEVEL=INFO
 RATE_LIMIT_ENABLED=false
 RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_WINDOW_MINUTES=1
-```
-
-## Usage
-
-### Running the Server
-
-```sh
-# Using UV
-uv run python run_server.py
-
-# Or directly with Python
-python run_server.py
 ```
 
 ## Available Tools

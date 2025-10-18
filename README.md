@@ -33,7 +33,7 @@ LibreNMS MCP Server is a Python-based Model Context Protocol (MCP) server design
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11, 3.12 or 3.13
 - Access to a LibreNMS
 - Valid LibreNMS token with appropriate permissions
 
@@ -72,6 +72,18 @@ python run_server.py
 
 # Or using the installed script
 librenms-mcp
+```
+
+### Using Docker
+
+A Docker images are available on GitHub Packages for easy deployment.
+
+```sh
+# Normal STDIO image
+docker pull ghcr.io/mhajder/librenms-mcp:latest
+
+# MCPO image for usage with Open WebUI
+docker pull ghcr.io/mhajder/librenms-mcpo:latest
 ```
 
 ### Development Setup

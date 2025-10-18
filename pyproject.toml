@@ -7,7 +7,7 @@ name = "librenms-mcp"
 version = "1.0.0"
 description = "MCP server for LibreNMS management"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 license = {file = "LICENSE"}
 authors = [
     {name = "Mateusz Hajder"},

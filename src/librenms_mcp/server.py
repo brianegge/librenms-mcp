@@ -12,9 +12,11 @@ from importlib.metadata import version
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
 from fastmcp.server.middleware.rate_limiting import SlidingWindowRateLimitingMiddleware
 
 from librenms_mcp.librenms_client import get_librenms_config_from_env
+from librenms_mcp.librenms_client import get_transport_config_from_env
 from librenms_mcp.librenms_middlewares import ReadOnlyTagMiddleware
 from librenms_mcp.librenms_tools import register_tools
 
@@ -34,6 +36,25 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.1"
 
+try:
+    LNMS_CONFIG = get_librenms_config_from_env()
+    TRANSPORT_CONFIG = get_transport_config_from_env()
+except Exception as e:
+    logger.error(f"Invalid configuration: {e}")
+    raise
+
+# Create auth provider if bearer token is configured
+auth_provider = None
+if getattr(TRANSPORT_CONFIG, "http_bearer_token", None):
+    auth_provider = StaticTokenVerifier(
+        tokens={
+            TRANSPORT_CONFIG.http_bearer_token: {
+                "client_id": "authenticated-client",
+                "scopes": ["read", "write"],
+            }
+        }
+    )
+
 # Initialize FastMCP server
 mcp = FastMCP(
     name="LibreNMS MCP Server",
@@ -41,13 +62,8 @@ mcp = FastMCP(
     instructions=(
         "This MCP server exposes tools for interacting with the LibreNMS API, supporting both read and write operations if not in read-only mode."
     ),
+    auth=auth_provider,
 )
-
-try:
-    LNMS_CONFIG = get_librenms_config_from_env()
-except Exception as e:
-    logger.error(f"Invalid LibreNMS configuration: {e}")
-    raise
 
 # Register all tools
 register_tools(mcp, LNMS_CONFIG)
@@ -77,7 +93,38 @@ def main():
         raise SystemExit(1)
 
     logger.info(f"Starting LibreNMS MCP Server at {LNMS_CONFIG.librenms_url} ...")
-    mcp.run()
+
+    # Choose transport based on configuration
+    if TRANSPORT_CONFIG.transport_type == "sse":
+        logger.info(
+            f"Using HTTP SSE transport on {TRANSPORT_CONFIG.http_host}:{TRANSPORT_CONFIG.http_port}"
+        )
+        if TRANSPORT_CONFIG.http_bearer_token:
+            logger.info("Bearer token authentication enabled for SSE transport")
+
+        # Run with HTTP SSE transport
+        mcp.run(
+            transport="sse",
+            host=TRANSPORT_CONFIG.http_host,
+            port=TRANSPORT_CONFIG.http_port,
+        )
+    elif TRANSPORT_CONFIG.transport_type == "http":
+        logger.info(
+            f"Using HTTP Streamable transport on {TRANSPORT_CONFIG.http_host}:{TRANSPORT_CONFIG.http_port}"
+        )
+        if TRANSPORT_CONFIG.http_bearer_token:
+            logger.info("Bearer token authentication enabled for Streamable transport")
+
+        # Run with HTTP Streamable transport
+        mcp.run(
+            transport="http",
+            host=TRANSPORT_CONFIG.http_host,
+            port=TRANSPORT_CONFIG.http_port,
+        )
+    else:
+        # Default to STDIO transport
+        logger.info("Using STDIO transport")
+        mcp.run()
 
 
 if __name__ == "__main__":

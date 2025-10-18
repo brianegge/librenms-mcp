@@ -135,6 +135,18 @@ LOG_LEVEL=INFO
 RATE_LIMIT_ENABLED=false
 RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_WINDOW_MINUTES=1
+
+# MCP Transport Configuration
+# Transport type: 'stdio' (default), 'sse' (Server-Sent Events), or 'http' (HTTP Streamable)
+MCP_TRANSPORT=stdio
+
+# HTTP Transport Settings (used when MCP_TRANSPORT=sse or MCP_TRANSPORT=http)
+# Host to bind the HTTP server (default: 0.0.0.0 for all interfaces)
+MCP_HTTP_HOST=0.0.0.0
+# Port to bind the HTTP server (default: 8000)
+MCP_HTTP_PORT=8000
+# Optional bearer token for authentication (leave empty for no auth)
+MCP_HTTP_BEARER_TOKEN=
 ```
 
 ## Available Tools
@@ -252,6 +264,60 @@ The server supports SSL certificate verification and custom timeout settings:
 LIBRENMS_VERIFY_SSL=true    # Enable SSL certificate verification
 LIBRENMS_TIMEOUT=30         # Connection timeout in seconds
 ```
+
+### Transport Configuration
+
+The server supports multiple transport mechanisms for the MCP protocol:
+
+#### STDIO Transport (Default)
+
+The default transport uses standard input/output for communication. This is ideal for local usage and integration with tools that communicate via stdin/stdout:
+
+```env
+MCP_TRANSPORT=stdio
+```
+
+#### HTTP SSE Transport (Server-Sent Events)
+
+For network-based deployments, you can use HTTP with Server-Sent Events. This allows the MCP server to be accessed over HTTP with real-time streaming:
+
+```env
+MCP_TRANSPORT=sse
+MCP_HTTP_HOST=0.0.0.0        # Bind to all interfaces (or specific IP)
+MCP_HTTP_PORT=8000           # Port to listen on
+MCP_HTTP_BEARER_TOKEN=your-secret-token  # Optional authentication token
+```
+
+When using SSE transport with a bearer token, clients must include the token in their requests:
+
+```bash
+curl -H "Authorization: Bearer your-secret-token" http://localhost:8000/sse
+```
+
+#### HTTP Streamable Transport
+
+The HTTP Streamable transport provides HTTP-based communication with request/response streaming. This is ideal for web integrations and tools that need HTTP endpoints:
+
+```env
+MCP_TRANSPORT=http
+MCP_HTTP_HOST=0.0.0.0        # Bind to all interfaces (or specific IP)
+MCP_HTTP_PORT=8000           # Port to listen on
+MCP_HTTP_BEARER_TOKEN=your-secret-token  # Optional authentication token
+```
+
+When using streamable transport with a bearer token:
+
+```sh
+curl -H "Authorization: Bearer your-secret-token" \
+     -H "Accept: application/json, text/event-stream" \
+     -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+     http://localhost:8000/mcp
+```
+
+**Note**: The HTTP transport requires proper JSON-RPC formatting with `jsonrpc` and `id` fields. The server may also require session initialization for some operations.
+
+For more information on FastMCP transports, see the [FastMCP documentation](https://gofastmcp.com/deployment/running-server#transport-protocols).
 
 ## Contributing
 

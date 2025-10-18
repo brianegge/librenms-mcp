@@ -33,5 +33,5 @@ jobs:
           body: |
             ## Docker Images
             - `ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.tag_name }}`
-            - `ghcr.io/${{ github.repository }}:mcpo-${{ steps.get_version.outputs.tag_name }}`
+            - `ghcr.io/${{ github.repository }}o:${{ steps.get_version.outputs.tag_name }}`
           prerelease: ${{ contains(steps.get_version.outputs.tag_name, '-') }}

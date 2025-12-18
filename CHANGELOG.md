@@ -1,3 +1,9 @@
+## v1.2.1 (2025-12-18)
+
+### Fix
+
+- **publish**: update release types to include 'created'
+
 ## v1.2.0 (2025-12-18)
 
 ### Feat

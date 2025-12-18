@@ -1,3 +1,9 @@
+## v1.2.2 (2025-12-18)
+
+### Fix
+
+- **publish**: change trigger from release types to push tags for PyPI publishing
+
 ## v1.2.1 (2025-12-18)
 
 ### Fix

@@ -1,3 +1,15 @@
+## v1.3.0 (2025-12-21)
+
+### Feat
+
+- **dependencies**: add fastmcp and sentry-sdk to fastmcp.json dependencies
+- **docker**: change MCP image to http transport as default
+- **sentry**: add optional Sentry integration for error tracking and performance monitoring
+
+### Fix
+
+- **docker**: update uv sync command to include all extras
+
 ## v1.2.2 (2025-12-18)
 
 ### Fix

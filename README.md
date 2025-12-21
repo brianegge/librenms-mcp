@@ -37,6 +37,30 @@ LibreNMS MCP Server is a Python-based Model Context Protocol (MCP) server design
 - Access to a LibreNMS
 - Valid LibreNMS token with appropriate permissions
 
+### Quick Install from PyPI
+
+The easiest way to get started is to install from PyPI:
+
+```sh
+# Using UV (recommended)
+uvx librenms-mcp
+
+# Or using pip
+pip install librenms-mcp
+```
+
+Remember to configure the environment variables for your LibreNMS instance before running the server:
+
+```sh
+# Create environment configuration
+export LIBRENMS_URL=https://domain.tld:8443
+export LIBRENMS_TOKEN=your-librenms-token
+```
+
+For more details, visit: https://pypi.org/project/librenms-mcp/
+
+### Install from Source
+
 1. Clone the repository:
 
 ```sh

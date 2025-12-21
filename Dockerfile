@@ -10,13 +10,13 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev
+    uv sync --locked --all-extras --no-install-project --no-dev
 
 COPY pyproject.toml uv.lock LICENSE README.md run_server.py ./
 COPY src/ ./src/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --all-extras --no-dev
 
 
 FROM python:3.13-alpine3.23

@@ -1,3 +1,9 @@
+## v1.4.0 (2025-12-22)
+
+### Feat
+
+- add support for disabling tools via tags
+
 ## v1.3.0 (2025-12-21)
 
 ### Feat

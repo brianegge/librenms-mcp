@@ -103,12 +103,22 @@ class LibreNMSClient:
 
 def get_librenms_config_from_env() -> LibreNMSConfig:
     """Get LibreNMS configuration from environment variables."""
+    # Parse disabled tags from comma-separated string
+    disabled_tags_str = os.getenv("DISABLED_TAGS", "")
+    disabled_tags = set()
+    if disabled_tags_str.strip():
+        # Split by comma and strip whitespace from each tag
+        disabled_tags = {
+            tag.strip() for tag in disabled_tags_str.split(",") if tag.strip()
+        }
+
     return LibreNMSConfig(
         librenms_url=os.getenv("LIBRENMS_URL"),
         token=os.getenv("LIBRENMS_TOKEN"),
         verify_ssl=parse_bool(os.getenv("LIBRENMS_VERIFY_SSL"), default=True),
         timeout=int(os.getenv("LIBRENMS_TIMEOUT", "30")),
         read_only_mode=parse_bool(os.getenv("READ_ONLY_MODE"), default=False),
+        disabled_tags=disabled_tags,
         rate_limit_enabled=parse_bool(os.getenv("RATE_LIMIT_ENABLED"), default=False),
         rate_limit_max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "60")),
         rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),

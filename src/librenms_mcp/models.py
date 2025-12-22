@@ -10,6 +10,9 @@ class LibreNMSConfig(BaseModel):
     verify_ssl: bool = Field(True, description="Verify SSL (true/false)")
     timeout: int = Field(30, description="Timeout in seconds")
     read_only_mode: bool = Field(False, description="Read-only mode (true/false)")
+    disabled_tags: set[str] = Field(
+        default_factory=set, description="Set of tags to disable tools for"
+    )
     rate_limit_enabled: bool = Field(
         False, description="Enable rate limiting (true/false)"
     )

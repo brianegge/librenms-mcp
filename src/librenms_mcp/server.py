@@ -17,6 +17,7 @@ from fastmcp.server.middleware.rate_limiting import SlidingWindowRateLimitingMid
 
 from librenms_mcp.librenms_client import get_librenms_config_from_env
 from librenms_mcp.librenms_client import get_transport_config_from_env
+from librenms_mcp.librenms_middlewares import DisabledTagsMiddleware
 from librenms_mcp.librenms_middlewares import ReadOnlyTagMiddleware
 from librenms_mcp.librenms_tools import register_tools
 from librenms_mcp.sentry_init import init_sentry
@@ -71,6 +72,13 @@ mcp = FastMCP(
 
 # Register all tools
 register_tools(mcp, LNMS_CONFIG)
+
+# Apply disabled tags middleware if any tags are disabled
+if getattr(LNMS_CONFIG, "disabled_tags", set()):
+    logger.info(
+        f"Disabled tags configured: {LNMS_CONFIG.disabled_tags} - applying middleware"
+    )
+    mcp.add_middleware(DisabledTagsMiddleware(LNMS_CONFIG.disabled_tags))
 
 # Enforce read-only behavior via middleware
 if getattr(LNMS_CONFIG, "read_only_mode", False):

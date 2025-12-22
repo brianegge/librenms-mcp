@@ -151,6 +151,11 @@ LIBRENMS_TIMEOUT=30
 # Set READ_ONLY_MODE true to disable all write operations (put, post, delete)
 READ_ONLY_MODE=false
 
+# Disabled Tags
+# Comma-separated list of tags to disable tools for (empty by default)
+# Example: DISABLED_TAGS=alert,bills
+DISABLED_TAGS=
+
 # Logging Configuration
 LOG_LEVEL=INFO
 
@@ -276,6 +281,14 @@ The server supports a read-only mode that disables all write operations for safe
 
 ```env
 READ_ONLY_MODE=true
+```
+
+### Tag-Based Tool Filtering
+
+You can disable specific categories of tools by setting disabled tags:
+
+```env
+DISABLED_TAGS=alert,bills
 ```
 
 ### Rate Limiting

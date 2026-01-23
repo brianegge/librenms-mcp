@@ -100,6 +100,12 @@ class LibreNMSClient:
         """Perform a DELETE request to a LibreNMS API path."""
         return await self.request("DELETE", path, params=params)
 
+    async def patch(
+        self, path: str, data: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Perform a PATCH request to a LibreNMS API path."""
+        return await self.request("PATCH", path, data=data)
+
 
 def get_librenms_config_from_env() -> LibreNMSConfig:
     """Get LibreNMS configuration from environment variables."""

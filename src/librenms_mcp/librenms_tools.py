@@ -133,6 +133,20 @@ def register_tools(mcp, config):
     )
     async def alert_acknowledge(
         alert_id: Annotated[int, Field(ge=1, description="Alert ID to acknowledge")],
+        note: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Optional note to attach to the acknowledgement",
+            ),
+        ] = None,
+        until_clear: Annotated[
+            bool | None,
+            Field(
+                default=None,
+                description="If true, acknowledge until the alert clears. If false, acknowledge only this instance.",
+            ),
+        ] = None,
         ctx: Context = None,
     ) -> dict:
         """
@@ -140,15 +154,25 @@ def register_tools(mcp, config):
 
         Args:
             alert_id (int): Alert ID to acknowledge.
+            note (str, optional): Note to attach to the acknowledgement.
+            until_clear (bool, optional): Whether to acknowledge until the alert clears.
 
         Returns:
             dict: The JSON response from the API.
         """
+        data: dict[str, Any] = {}
+        if note is not None:
+            data["note"] = note
+        if until_clear is not None:
+            data["until_clear"] = until_clear
+
         try:
             await ctx.info(f"Acknowledging alert {alert_id}")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"alerts/{alert_id}")
+                return await client.put(
+                    f"alerts/{alert_id}", data=data if data else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error acknowledging alert {alert_id}: {e!s}")
@@ -254,14 +278,33 @@ def register_tools(mcp, config):
         },
     )
     async def alert_rule_add(
-        payload: Annotated[dict, Field(description="Alert rule definition payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Alert rule payload fields:
+- name (required): Rule name
+- builder (required): Rule builder JSON with conditions
+- devices (required): Array of device IDs or [-1] for all devices
+- severity (required): ok, warning, critical
+- count (optional): Trigger threshold count (default: 1)
+- delay (optional): Delay before alerting in seconds
+- interval (optional): Re-alert interval in seconds
+- mute (optional): Mute alerts (true/false)
+- invert (optional): Invert rule logic (true/false)
+- notes (optional): Rule notes
+- disabled (optional): Disable rule (0/1)
+
+Example:
+{"name": "Device Down", "severity": "critical", "devices": [-1], "builder": {"condition": "AND", "rules": [...]}}"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Add a new alert rule to LibreNMS.
 
         Args:
-            payload (dict): Alert rule definition payload.
+            payload (dict): Alert rule definition with name, builder, devices, and severity.
 
         Returns:
             dict: The JSON response from the API.
@@ -286,7 +329,22 @@ def register_tools(mcp, config):
     )
     async def alert_rule_edit(
         payload: Annotated[
-            dict, Field(description="Edited alert rule payload (must include ID)")
+            dict,
+            Field(
+                description="""Alert rule edit payload (must include id field):
+- id (required): Rule ID to edit
+- name: Rule name
+- builder: Rule builder JSON with conditions
+- devices: Array of device IDs or [-1] for all devices
+- severity: ok, warning, critical
+- count: Trigger threshold count
+- delay: Delay before alerting in seconds
+- interval: Re-alert interval in seconds
+- mute: Mute alerts (true/false)
+- invert: Invert rule logic (true/false)
+- notes: Rule notes
+- disabled: Disable rule (0/1)"""
+            ),
         ],
         ctx: Context = None,
     ) -> dict:
@@ -294,7 +352,7 @@ def register_tools(mcp, config):
         Edit an existing alert rule in LibreNMS.
 
         Args:
-            payload (dict): Edited alert rule payload (must include ID).
+            payload (dict): Alert rule payload with id and fields to update.
 
         Returns:
             dict: The JSON response from the API.
@@ -354,7 +412,10 @@ def register_tools(mcp, config):
     )
     async def arp_search(
         query: Annotated[
-            str, Field(description="Search string for ARP entries (MAC/IP/partial)")
+            str,
+            Field(
+                description='Search string for ARP entries. Supports IP address, MAC address, CIDR notation, or "all" (use with device parameter for all entries on a device)'
+            ),
         ],
         ctx: Context = None,
     ) -> dict:
@@ -362,7 +423,7 @@ def register_tools(mcp, config):
         Retrieve ARP entries from LibreNMS by search query.
 
         Args:
-            query (str): Search string for ARP entries (MAC/IP/partial).
+            query (str): Search string - IP, MAC, CIDR notation, or "all".
 
         Returns:
             dict: The JSON response from the API.
@@ -481,8 +542,11 @@ def register_tools(mcp, config):
         },
     )
     async def bill_graph(
-        bill_id: Annotated[int, Field(ge=1)],
-        graph_type: Annotated[str, Field(description="Graph type, e.g. bits")],
+        bill_id: Annotated[int, Field(ge=1, description="Bill ID")],
+        graph_type: Annotated[
+            str,
+            Field(description="Graph type: bits, monthly, hour, or day"),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -490,7 +554,7 @@ def register_tools(mcp, config):
 
         Args:
             bill_id (int): Bill ID.
-            graph_type (str): Graph type, e.g. bits.
+            graph_type (str): Type of graph (bits, monthly, hour, day).
 
         Returns:
             dict: The JSON response from the API.
@@ -514,8 +578,11 @@ def register_tools(mcp, config):
         },
     )
     async def bill_graph_data(
-        bill_id: Annotated[int, Field(ge=1)],
-        graph_type: Annotated[str, Field(description="Graph type")],
+        bill_id: Annotated[int, Field(ge=1, description="Bill ID")],
+        graph_type: Annotated[
+            str,
+            Field(description="Graph type: bits, monthly, hour, or day"),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -523,7 +590,7 @@ def register_tools(mcp, config):
 
         Args:
             bill_id (int): Bill ID.
-            graph_type (str): Graph type.
+            graph_type (str): Type of graph (bits, monthly, hour, day).
 
         Returns:
             dict: The JSON response from the API.
@@ -578,9 +645,12 @@ def register_tools(mcp, config):
         },
     )
     async def bill_history_graph(
-        bill_id: Annotated[int, Field(ge=1)],
+        bill_id: Annotated[int, Field(ge=1, description="Bill ID")],
         history_id: Annotated[int, Field(ge=1, description="Bill history ID")],
-        graph_type: Annotated[str, Field(description="Graph type")],
+        graph_type: Annotated[
+            str,
+            Field(description="Graph type: bits, monthly, hour, or day"),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -589,7 +659,7 @@ def register_tools(mcp, config):
         Args:
             bill_id (int): Bill ID.
             history_id (int): Bill history ID.
-            graph_type (str): Graph type.
+            graph_type (str): Type of graph (bits, monthly, hour, day).
 
         Returns:
             dict: The JSON response from the API.
@@ -615,9 +685,12 @@ def register_tools(mcp, config):
         },
     )
     async def bill_history_graph_data(
-        bill_id: Annotated[int, Field(ge=1)],
-        history_id: Annotated[int, Field(ge=1)],
-        graph_type: Annotated[str, Field()],
+        bill_id: Annotated[int, Field(ge=1, description="Bill ID")],
+        history_id: Annotated[int, Field(ge=1, description="Bill history ID")],
+        graph_type: Annotated[
+            str,
+            Field(description="Graph type: bits, monthly, hour, or day"),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -626,7 +699,7 @@ def register_tools(mcp, config):
         Args:
             bill_id (int): Bill ID.
             history_id (int): Bill history ID.
-            graph_type (str): Graph type.
+            graph_type (str): Type of graph (bits, monthly, hour, day).
 
         Returns:
             dict: The JSON response from the API.
@@ -652,14 +725,29 @@ def register_tools(mcp, config):
         },
     )
     async def bill_create_or_update(
-        payload: Annotated[dict, Field(description="Bill payload (create/update)")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Bill payload fields:
+- bill_id (for updates only): Existing bill ID
+- bill_name (required for create): Bill name
+- ports (required for create): Array of port IDs to include
+- bill_type (required): "quota" or "cdr" (95th percentile)
+- bill_quota (required if quota type): Quota in bytes
+- bill_cdr (required if cdr type): Committed data rate
+- bill_day (optional): Billing day of month (1-31)
+- bill_custid (optional): Customer ID reference
+- bill_ref (optional): Billing reference
+- bill_notes (optional): Notes"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Create or update a bill in LibreNMS.
 
         Args:
-            payload (dict): Bill payload (create/update).
+            payload (dict): Bill payload with name, ports, and billing type.
 
         Returns:
             dict: The JSON response from the API.
@@ -742,14 +830,30 @@ def register_tools(mcp, config):
         },
     )
     async def devicegroup_add(
-        payload: Annotated[dict, Field(description="Device group definition payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Device group payload fields:
+- name (required): Group name
+- type (required): "static" or "dynamic"
+- desc (optional): Group description
+- rules (required if dynamic): Dynamic group rule builder JSON
+- devices (required if static): Array of device IDs
+
+Example static group:
+{"name": "Routers", "type": "static", "devices": [1, 2, 3]}
+
+Example dynamic group:
+{"name": "Linux Servers", "type": "dynamic", "rules": {"condition": "AND", "rules": [{"field": "os", "operator": "equal", "value": "linux"}]}}"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Add a new device group to LibreNMS.
 
         Args:
-            payload (dict): Device group definition payload.
+            payload (dict): Device group definition with name, type, and devices/rules.
 
         Returns:
             dict: The JSON response from the API.
@@ -774,7 +878,17 @@ def register_tools(mcp, config):
     )
     async def devicegroup_update(
         name: Annotated[str, Field(description="Device group name")],
-        payload: Annotated[dict, Field(description="Patch payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Patchable fields:
+- name: New group name
+- type: "static" or "dynamic"
+- desc: Group description
+- rules: Dynamic group rules (for dynamic groups)
+- devices: Array of device IDs (for static groups)"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -782,7 +896,7 @@ def register_tools(mcp, config):
 
         Args:
             name (str): Device group name.
-            payload (dict): Patch payload.
+            payload (dict): Fields to update.
 
         Returns:
             dict: The JSON response from the API.
@@ -838,6 +952,13 @@ def register_tools(mcp, config):
     )
     async def devicegroup_devices(
         name: Annotated[str, Field(description="Device group name")],
+        full: Annotated[
+            bool | None,
+            Field(
+                default=None,
+                description="Set to true to get complete device data instead of just IDs",
+            ),
+        ] = None,
         ctx: Context = None,
     ) -> dict:
         """
@@ -845,15 +966,22 @@ def register_tools(mcp, config):
 
         Args:
             name (str): Device group name.
+            full (bool, optional): If true, returns full device details.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if full:
+            params["full"] = 1
+
         try:
             await ctx.info(f"Listing devices in group {name}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"devicegroups/{name}")
+                return await client.get(
+                    f"devicegroups/{name}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error listing devices in group {name}: {e!s}")
@@ -868,8 +996,17 @@ def register_tools(mcp, config):
         },
     )
     async def devicegroup_set_maintenance(
-        name: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Maintenance payload")],
+        name: Annotated[str, Field(description="Device group name")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Maintenance mode payload:
+- duration (required): Duration in "H:i" format (e.g., "02:00" for 2 hours)
+- title (optional): Maintenance window title
+- notes (optional): Maintenance notes
+- start (optional): Start time in "Y-m-d H:i:00" format (default: now)"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -877,7 +1014,7 @@ def register_tools(mcp, config):
 
         Args:
             name (str): Device group name.
-            payload (dict): Maintenance payload.
+            payload (dict): Maintenance payload with duration.
 
         Returns:
             dict: The JSON response from the API.
@@ -903,8 +1040,13 @@ def register_tools(mcp, config):
         },
     )
     async def devicegroup_add_devices(
-        name: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Device IDs/hostnames to add")],
+        name: Annotated[str, Field(description="Device group name")],
+        payload: Annotated[
+            dict,
+            Field(
+                description='Array of device IDs to add. Format: {"devices": [1, 2, 3]}'
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -912,7 +1054,7 @@ def register_tools(mcp, config):
 
         Args:
             name (str): Device group name.
-            payload (dict): Device IDs/hostnames to add.
+            payload (dict): Device IDs to add as {"devices": [...]}.
 
         Returns:
             dict: The JSON response from the API.
@@ -936,8 +1078,13 @@ def register_tools(mcp, config):
         },
     )
     async def devicegroup_remove_devices(
-        name: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Device IDs/hostnames to remove")],
+        name: Annotated[str, Field(description="Device group name")],
+        payload: Annotated[
+            dict,
+            Field(
+                description='Array of device IDs to remove. Format: {"devices": [1, 2, 3]}'
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -945,7 +1092,7 @@ def register_tools(mcp, config):
 
         Args:
             name (str): Device group name.
-            payload (dict): Device IDs/hostnames to remove.
+            payload (dict): Device IDs to remove as {"devices": [...]}.
 
         Returns:
             dict: The JSON response from the API.
@@ -978,19 +1125,29 @@ def register_tools(mcp, config):
             dict | None,
             Field(
                 default=None,
-                description="Optional query parameters (limit, type, etc.)",
+                description="""Query parameters for filtering devices. Examples:
+- {"type": "hostname", "query": "router"} - search by hostname substring
+- {"type": "os", "query": "linux"} - filter by operating system
+- {"type": "location", "query": "datacenter"} - filter by location
+- {"type": "up"} or {"type": "down"} - filter by status
+- {"limit": 50} - limit number of results
+- {"order": "hostname ASC"} - sort results
+
+Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6, location, location_id, hostname, sysName, display, device_id, type, serial, version, hardware, features""",
             ),
         ] = None,
         ctx: Context = None,
     ) -> dict:
         """
-        List devices from LibreNMS.
+        List devices from LibreNMS with optional filters.
 
         Args:
-            query (dict, optional): Optional query parameters (limit, type, etc.).
+            query (dict, optional): Query parameters for filtering. Use "type" to filter
+                by category (hostname, os, location, up, down, etc.) and "query" for
+                the search term. Can also include "limit" and "order".
 
         Returns:
-            dict: The JSON response from the API.
+            dict: The JSON response from the API containing device list.
         """
         try:
             await ctx.info("Listing devices...")
@@ -1012,7 +1169,24 @@ def register_tools(mcp, config):
     )
     async def device_add(
         payload: Annotated[
-            dict, Field(description="Device add payload (hostname, community, etc.)")
+            dict,
+            Field(
+                description="""Device add payload. Required and optional fields:
+- hostname (required): Device hostname or IP
+- version (optional): SNMP version (v1, v2c, v3). Default: v2c
+- community (required for v1/v2c): SNMP community string
+- authlevel (required for v3): noAuthNoPriv, authNoPriv, authPriv
+- authname (required for v3): SNMPv3 username
+- authpass (required for v3 with auth): Authentication password
+- authalgo (optional): MD5 or SHA
+- cryptopass (required for authPriv): Privacy password
+- cryptoalgo (optional): AES or DES
+- port (optional): SNMP port (default: 161)
+- transport (optional): udp or tcp
+- poller_group (optional): Poller group ID
+- force_add (optional): Skip ICMP/SNMP checks (true/false)
+- ping_fallback (optional): Add as ping-only if SNMP fails"""
+            ),
         ],
         ctx: Context = None,
     ) -> dict:
@@ -1020,7 +1194,7 @@ def register_tools(mcp, config):
         Add a new device to LibreNMS.
 
         Args:
-            payload (dict): Device add payload (hostname, community, etc.).
+            payload (dict): Device add payload with hostname and SNMP credentials.
 
         Returns:
             dict: The JSON response from the API.
@@ -1106,16 +1280,30 @@ def register_tools(mcp, config):
         },
     )
     async def device_update(
-        hostname: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Patch fields for device")],
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Patchable device fields:
+- notes: Device notes/comments
+- purpose: Device purpose description
+- override_sysLocation: true/false to override SNMP location
+- location_id: Location ID to assign
+- poller_group: Poller group ID
+- ignore: 0/1 to ignore device in alerts
+- disabled: 0/1 to disable polling
+- display: Custom display name
+- type: Device type classification"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Update device fields in LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
-            payload (dict): Patch fields for device.
+            hostname (str): Device hostname or ID.
+            payload (dict): Fields to update on the device.
 
         Returns:
             dict: The JSON response from the API.
@@ -1139,22 +1327,37 @@ def register_tools(mcp, config):
         },
     )
     async def device_ports(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        columns: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Comma-separated list of columns to return (e.g., 'port_id,ifName,ifAlias,ifOperStatus')",
+            ),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         List ports for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            columns (str, optional): Comma-separated columns to return.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if columns is not None:
+            params["columns"] = columns
+
         try:
             await ctx.info(f"Listing ports for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"devices/{hostname}/ports")
+                return await client.get(
+                    f"devices/{hostname}/ports", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error listing ports for {hostname}: {e!s}")
@@ -1264,16 +1467,25 @@ def register_tools(mcp, config):
         },
     )
     async def device_set_maintenance(
-        hostname: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Maintenance payload")],
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Maintenance mode payload:
+- duration (required): Duration in "H:i" format (e.g., "02:00" for 2 hours)
+- title (optional): Maintenance window title
+- notes (optional): Maintenance notes
+- start (optional): Start time in "Y-m-d H:i:00" format (default: now)"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Set device maintenance in LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
-            payload (dict): Maintenance payload.
+            hostname (str): Device hostname or ID.
+            payload (dict): Maintenance payload with duration.
 
         Returns:
             dict: The JSON response from the API.
@@ -1302,22 +1514,47 @@ def register_tools(mcp, config):
         },
     )
     async def inventory_device(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        ent_physical_class: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Filter by entity physical class (e.g., chassis, module, port, powerSupply, fan, sensor)",
+            ),
+        ] = None,
+        ent_physical_contained_in: Annotated[
+            int | None,
+            Field(
+                default=None,
+                description="Filter by parent entity index",
+            ),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get inventory for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            ent_physical_class (str, optional): Filter by entity physical class.
+            ent_physical_contained_in (int, optional): Filter by parent entity.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if ent_physical_class is not None:
+            params["entPhysicalClass"] = ent_physical_class
+        if ent_physical_contained_in is not None:
+            params["entPhysicalContainedIn"] = ent_physical_contained_in
+
         try:
             await ctx.info(f"Getting inventory for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"inventory/{hostname}")
+                return await client.get(
+                    f"inventory/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error inventory {hostname}: {e!s}")
@@ -1390,14 +1627,23 @@ def register_tools(mcp, config):
         },
     )
     async def location_add(
-        payload: Annotated[dict, Field(description="Location payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Location payload fields:
+- location (required): Location name
+- lat (required): Latitude coordinate (decimal degrees)
+- lng (required): Longitude coordinate (decimal degrees)
+- fixed_coordinates (optional): 0 = update from device, 1 = fixed (default: 1)"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Add a new location to LibreNMS.
 
         Args:
-            payload (dict): Location payload.
+            payload (dict): Location definition with name and coordinates.
 
         Returns:
             dict: The JSON response from the API.
@@ -1452,8 +1698,15 @@ def register_tools(mcp, config):
         },
     )
     async def location_edit(
-        location: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Location patch payload")],
+        location: Annotated[str, Field(description="Location identifier or name")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Location patchable fields:
+- lat: Latitude coordinate (decimal degrees)
+- lng: Longitude coordinate (decimal degrees)"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -1461,7 +1714,7 @@ def register_tools(mcp, config):
 
         Args:
             location (str): Location identifier.
-            payload (dict): Location patch payload.
+            payload (dict): Fields to update (lat, lng).
 
         Returns:
             dict: The JSON response from the API.
@@ -1518,22 +1771,68 @@ def register_tools(mcp, config):
         },
     )
     async def logs_eventlog(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        start: Annotated[
+            int | None,
+            Field(default=None, description="Page number for pagination"),
+        ] = None,
+        limit: Annotated[
+            int | None,
+            Field(default=None, description="Maximum number of results to return"),
+        ] = None,
+        from_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Start timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        to_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="End timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        sortorder: Annotated[
+            str | None,
+            Field(default=None, description="Sort order: ASC or DESC"),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get event logs for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            start (int, optional): Page number.
+            limit (int, optional): Max results.
+            from_ts (str, optional): Start timestamp.
+            to_ts (str, optional): End timestamp.
+            sortorder (str, optional): ASC or DESC.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if start is not None:
+            params["start"] = start
+        if limit is not None:
+            params["limit"] = limit
+        if from_ts is not None:
+            params["from"] = from_ts
+        if to_ts is not None:
+            params["to"] = to_ts
+        if sortorder is not None:
+            params["sortorder"] = sortorder
+
         try:
             await ctx.info(f"Getting event logs for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"logs/eventlog/{hostname}")
+                return await client.get(
+                    f"logs/eventlog/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error eventlog {hostname}: {e!s}")
@@ -1548,22 +1847,68 @@ def register_tools(mcp, config):
         },
     )
     async def logs_syslog(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        start: Annotated[
+            int | None,
+            Field(default=None, description="Page number for pagination"),
+        ] = None,
+        limit: Annotated[
+            int | None,
+            Field(default=None, description="Maximum number of results to return"),
+        ] = None,
+        from_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Start timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        to_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="End timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        sortorder: Annotated[
+            str | None,
+            Field(default=None, description="Sort order: ASC or DESC"),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get syslogs for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            start (int, optional): Page number.
+            limit (int, optional): Max results.
+            from_ts (str, optional): Start timestamp.
+            to_ts (str, optional): End timestamp.
+            sortorder (str, optional): ASC or DESC.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if start is not None:
+            params["start"] = start
+        if limit is not None:
+            params["limit"] = limit
+        if from_ts is not None:
+            params["from"] = from_ts
+        if to_ts is not None:
+            params["to"] = to_ts
+        if sortorder is not None:
+            params["sortorder"] = sortorder
+
         try:
             await ctx.info(f"Getting syslogs for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"logs/syslog/{hostname}")
+                return await client.get(
+                    f"logs/syslog/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error syslog {hostname}: {e!s}")
@@ -1578,22 +1923,68 @@ def register_tools(mcp, config):
         },
     )
     async def logs_alertlog(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        start: Annotated[
+            int | None,
+            Field(default=None, description="Page number for pagination"),
+        ] = None,
+        limit: Annotated[
+            int | None,
+            Field(default=None, description="Maximum number of results to return"),
+        ] = None,
+        from_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Start timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        to_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="End timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        sortorder: Annotated[
+            str | None,
+            Field(default=None, description="Sort order: ASC or DESC"),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get alert logs for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            start (int, optional): Page number.
+            limit (int, optional): Max results.
+            from_ts (str, optional): Start timestamp.
+            to_ts (str, optional): End timestamp.
+            sortorder (str, optional): ASC or DESC.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if start is not None:
+            params["start"] = start
+        if limit is not None:
+            params["limit"] = limit
+        if from_ts is not None:
+            params["from"] = from_ts
+        if to_ts is not None:
+            params["to"] = to_ts
+        if sortorder is not None:
+            params["sortorder"] = sortorder
+
         try:
             await ctx.info(f"Getting alert logs for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"logs/alertlog/{hostname}")
+                return await client.get(
+                    f"logs/alertlog/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error alertlog {hostname}: {e!s}")
@@ -1608,22 +1999,68 @@ def register_tools(mcp, config):
         },
     )
     async def logs_authlog(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        start: Annotated[
+            int | None,
+            Field(default=None, description="Page number for pagination"),
+        ] = None,
+        limit: Annotated[
+            int | None,
+            Field(default=None, description="Maximum number of results to return"),
+        ] = None,
+        from_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="Start timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        to_ts: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="End timestamp filter (Unix timestamp or datetime string)",
+            ),
+        ] = None,
+        sortorder: Annotated[
+            str | None,
+            Field(default=None, description="Sort order: ASC or DESC"),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get auth logs for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            start (int, optional): Page number.
+            limit (int, optional): Max results.
+            from_ts (str, optional): Start timestamp.
+            to_ts (str, optional): End timestamp.
+            sortorder (str, optional): ASC or DESC.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if start is not None:
+            params["start"] = start
+        if limit is not None:
+            params["limit"] = limit
+        if from_ts is not None:
+            params["from"] = from_ts
+        if to_ts is not None:
+            params["to"] = to_ts
+        if sortorder is not None:
+            params["sortorder"] = sortorder
+
         try:
             await ctx.info(f"Getting auth logs for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"logs/authlog/{hostname}")
+                return await client.get(
+                    f"logs/authlog/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error authlog {hostname}: {e!s}")
@@ -1638,14 +2075,19 @@ def register_tools(mcp, config):
         },
     )
     async def logs_syslogsink(
-        payload: Annotated[dict, Field(description="Syslog sink payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="JSON syslog message to ingest into LibreNMS syslog storage"
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
-        Add a syslog sink to LibreNMS.
+        Add a syslog entry to LibreNMS via API sink.
 
         Args:
-            payload (dict): Syslog sink payload.
+            payload (dict): Syslog message data.
 
         Returns:
             dict: The JSON response from the API.
@@ -1733,14 +2175,21 @@ def register_tools(mcp, config):
         },
     )
     async def port_group_add(
-        payload: Annotated[dict, Field(description="Port group payload")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Port group payload:
+- name (required): Port group name
+- desc (optional): Port group description"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Add a port group to LibreNMS.
 
         Args:
-            payload (dict): Port group payload.
+            payload (dict): Port group definition with name and optional description.
 
         Returns:
             dict: The JSON response from the API.
@@ -1794,16 +2243,19 @@ def register_tools(mcp, config):
         },
     )
     async def port_group_assign(
-        port_group_id: Annotated[int, Field(ge=1)],
-        payload: Annotated[dict, Field(description="Assignment payload")],
+        port_group_id: Annotated[int, Field(ge=1, description="Port group ID")],
+        payload: Annotated[
+            dict,
+            Field(description='Port IDs to assign. Format: {"port_ids": [1, 2, 3]}'),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
-        Assign a port group in LibreNMS.
+        Assign ports to a port group in LibreNMS.
 
         Args:
             port_group_id (int): Port group ID.
-            payload (dict): Assignment payload.
+            payload (dict): Port IDs to assign as {"port_ids": [...]}.
 
         Returns:
             dict: The JSON response from the API.
@@ -1829,16 +2281,19 @@ def register_tools(mcp, config):
         },
     )
     async def port_group_remove(
-        port_group_id: Annotated[int, Field(ge=1)],
-        payload: Annotated[dict, Field(description="Removal payload")],
+        port_group_id: Annotated[int, Field(ge=1, description="Port group ID")],
+        payload: Annotated[
+            dict,
+            Field(description='Port IDs to remove. Format: {"port_ids": [1, 2, 3]}'),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
-        Remove a port group in LibreNMS.
+        Remove ports from a port group in LibreNMS.
 
         Args:
             port_group_id (int): Port group ID.
-            payload (dict): Removal payload.
+            payload (dict): Port IDs to remove as {"port_ids": [...]}.
 
         Returns:
             dict: The JSON response from the API.
@@ -1870,19 +2325,25 @@ def register_tools(mcp, config):
         query: Annotated[
             dict | None,
             Field(
-                default=None, description="Optional filters (limit, device_id, etc.)"
+                default=None,
+                description="""Query parameters for filtering ports:
+- columns: Comma-separated list of fields to return (e.g., "port_id,ifName,ifAlias")
+- device_id: Filter by device ID
+- limit: Maximum number of results
+
+Available columns: port_id, device_id, ifDescr, ifName, ifAlias, ifType, ifSpeed, ifOperStatus, ifAdminStatus, etc.""",
             ),
         ] = None,
         ctx: Context = None,
     ) -> dict:
         """
-        Get all ports from LibreNMS.
+        Get all ports from LibreNMS with optional filters.
 
         Args:
-            query (dict, optional): Optional filters (limit, device_id, etc.).
+            query (dict, optional): Filter parameters including columns, device_id, and limit.
 
         Returns:
-            dict: The JSON response from the API.
+            dict: The JSON response from the API containing port list.
         """
         try:
             await ctx.info("Getting all ports...")
@@ -1903,13 +2364,19 @@ def register_tools(mcp, config):
         },
     )
     async def ports_search(
-        search: Annotated[str, Field(description="Search string")], ctx: Context = None
+        search: Annotated[
+            str,
+            Field(
+                description="Search string - searches ifAlias, ifDescr, and ifName fields"
+            ),
+        ],
+        ctx: Context = None,
     ) -> dict:
         """
         Search ports in LibreNMS by search string.
 
         Args:
-            search (str): Search string.
+            search (str): Search term to match against ifAlias, ifDescr, ifName.
 
         Returns:
             dict: The JSON response from the API.
@@ -1933,15 +2400,20 @@ def register_tools(mcp, config):
         },
     )
     async def ports_search_field(
-        field: Annotated[str, Field(description="Field name")],
+        field: Annotated[
+            str,
+            Field(
+                description="Field to search: ifAlias, ifDescr, ifName, ifType, etc."
+            ),
+        ],
         search: Annotated[str, Field(description="Search term")],
         ctx: Context = None,
     ) -> dict:
         """
-        Search ports in LibreNMS by field and search term.
+        Search ports in LibreNMS by specific field.
 
         Args:
-            field (str): Field name.
+            field (str): Field to search (ifAlias, ifDescr, ifName, etc.).
             search (str): Search term.
 
         Returns:
@@ -1966,14 +2438,19 @@ def register_tools(mcp, config):
         },
     )
     async def ports_search_mac(
-        mac: Annotated[str, Field(description="MAC address search")],
+        mac: Annotated[
+            str,
+            Field(
+                description="MAC address to search. Accepts multiple formats: aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff, or aabbccddeeff"
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Search ports in LibreNMS by MAC address.
 
         Args:
-            mac (str): MAC address search.
+            mac (str): MAC address in any common format.
 
         Returns:
             dict: The JSON response from the API.
@@ -2117,8 +2594,13 @@ def register_tools(mcp, config):
         },
     )
     async def port_description_update(
-        port_id: Annotated[int, Field(ge=1)],
-        payload: Annotated[dict, Field(description="Description update payload")],
+        port_id: Annotated[int, Field(ge=1, description="Port ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description='Port description payload. Format: {"description": "new description"}'
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -2126,7 +2608,7 @@ def register_tools(mcp, config):
 
         Args:
             port_id (int): Port ID.
-            payload (dict): Description update payload.
+            payload (dict): Description as {"description": "..."}.
 
         Returns:
             dict: The JSON response from the API.
@@ -2152,18 +2634,81 @@ def register_tools(mcp, config):
             "idempotentHint": True,
         },
     )
-    async def bgp_sessions(ctx: Context = None) -> dict:
+    async def bgp_sessions(
+        hostname: Annotated[
+            str | None,
+            Field(default=None, description="Filter by device hostname"),
+        ] = None,
+        asn: Annotated[
+            int | None,
+            Field(default=None, description="Filter by local ASN"),
+        ] = None,
+        remote_asn: Annotated[
+            int | None,
+            Field(default=None, description="Filter by remote ASN"),
+        ] = None,
+        remote_address: Annotated[
+            str | None,
+            Field(default=None, description="Filter by remote IP address"),
+        ] = None,
+        local_address: Annotated[
+            str | None,
+            Field(default=None, description="Filter by local IP address"),
+        ] = None,
+        bgp_descr: Annotated[
+            str | None,
+            Field(default=None, description="Filter by BGP description (SQL LIKE)"),
+        ] = None,
+        bgp_state: Annotated[
+            str | None,
+            Field(default=None, description="Filter by BGP state (e.g., established)"),
+        ] = None,
+        bgp_adminstate: Annotated[
+            str | None,
+            Field(
+                default=None, description="Filter by admin state (start, stop, running)"
+            ),
+        ] = None,
+        bgp_family: Annotated[
+            int | None,
+            Field(
+                default=None,
+                description="Filter by address family: 4 (IPv4) or 6 (IPv6)",
+            ),
+        ] = None,
+        ctx: Context = None,
+    ) -> dict:
         """
-        List BGP sessions from LibreNMS.
+        List BGP sessions from LibreNMS with optional filters.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if hostname is not None:
+            params["hostname"] = hostname
+        if asn is not None:
+            params["asn"] = asn
+        if remote_asn is not None:
+            params["remote_asn"] = remote_asn
+        if remote_address is not None:
+            params["remote_address"] = remote_address
+        if local_address is not None:
+            params["local_address"] = local_address
+        if bgp_descr is not None:
+            params["bgp_descr"] = bgp_descr
+        if bgp_state is not None:
+            params["bgp_state"] = bgp_state
+        if bgp_adminstate is not None:
+            params["bgp_adminstate"] = bgp_adminstate
+        if bgp_family is not None:
+            params["bgp_family"] = bgp_family
+
         try:
             await ctx.info("Listing BGP sessions...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get("bgp")
+                return await client.get("bgp", params=params if params else None)
 
         except Exception as e:
             await ctx.error(f"Error listing BGP sessions: {e!s}")
@@ -2208,8 +2753,13 @@ def register_tools(mcp, config):
         },
     )
     async def bgp_session_edit(
-        bgp_id: Annotated[int, Field(ge=1)],
-        payload: Annotated[dict, Field(description="BGP edit payload")],
+        bgp_id: Annotated[int, Field(ge=1, description="BGP session ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description='BGP session payload. Format: {"bgp_descr": "description"}'
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -2217,7 +2767,7 @@ def register_tools(mcp, config):
 
         Args:
             bgp_id (int): BGP session ID.
-            payload (dict): BGP edit payload.
+            payload (dict): BGP fields to update.
 
         Returns:
             dict: The JSON response from the API.
@@ -2268,18 +2818,42 @@ def register_tools(mcp, config):
             "idempotentHint": True,
         },
     )
-    async def services_list(ctx: Context = None) -> dict:
+    async def services_list(
+        state: Annotated[
+            int | None,
+            Field(
+                default=None, description="Filter by state: 0=Ok, 1=Warning, 2=Critical"
+            ),
+        ] = None,
+        service_type: Annotated[
+            str | None,
+            Field(
+                default=None, description="Filter by service type (SQL LIKE pattern)"
+            ),
+        ] = None,
+        ctx: Context = None,
+    ) -> dict:
         """
-        List all services from LibreNMS.
+        List all services from LibreNMS with optional filters.
+
+        Args:
+            state (int, optional): Filter by state (0=Ok, 1=Warning, 2=Critical).
+            service_type (str, optional): Filter by service type.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if state is not None:
+            params["state"] = state
+        if service_type is not None:
+            params["type"] = service_type
+
         try:
             await ctx.info("Listing services...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get("services")
+                return await client.get("services", params=params if params else None)
 
         except Exception as e:
             await ctx.error(f"Error listing services: {e!s}")
@@ -2294,22 +2868,45 @@ def register_tools(mcp, config):
         },
     )
     async def services_for_device(
-        hostname: Annotated[str, Field()], ctx: Context = None
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        state: Annotated[
+            int | None,
+            Field(
+                default=None, description="Filter by state: 0=Ok, 1=Warning, 2=Critical"
+            ),
+        ] = None,
+        service_type: Annotated[
+            str | None,
+            Field(
+                default=None, description="Filter by service type (SQL LIKE pattern)"
+            ),
+        ] = None,
+        ctx: Context = None,
     ) -> dict:
         """
         Get services for a device from LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
+            hostname (str): Device hostname or ID.
+            state (int, optional): Filter by state (0=Ok, 1=Warning, 2=Critical).
+            service_type (str, optional): Filter by service type.
 
         Returns:
             dict: The JSON response from the API.
         """
+        params: dict[str, Any] = {}
+        if state is not None:
+            params["state"] = state
+        if service_type is not None:
+            params["type"] = service_type
+
         try:
             await ctx.info(f"Getting services for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"services/{hostname}")
+                return await client.get(
+                    f"services/{hostname}", params=params if params else None
+                )
 
         except Exception as e:
             await ctx.error(f"Error services for {hostname}: {e!s}")
@@ -2324,16 +2921,28 @@ def register_tools(mcp, config):
         },
     )
     async def service_add(
-        hostname: Annotated[str, Field()],
-        payload: Annotated[dict, Field(description="Service add payload")],
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Service monitoring payload:
+- type (required): Service check type (e.g., "http", "https", "dns", "ping", "smtp", "ssh", "tcp", "icmp")
+- ip (optional): Service IP address (defaults to device IP)
+- desc (optional): Service description
+- param (optional): Check parameters/arguments (service-specific)
+- ignore (optional): Exclude from alerts (0/1)
+
+Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
         Add a service for a device in LibreNMS.
 
         Args:
-            hostname (str): Device hostname.
-            payload (dict): Service add payload.
+            hostname (str): Device hostname or ID.
+            payload (dict): Service definition with type and optional parameters.
 
         Returns:
             dict: The JSON response from the API.
@@ -2357,8 +2966,18 @@ def register_tools(mcp, config):
         },
     )
     async def service_edit(
-        service_id: Annotated[int, Field(ge=1)],
-        payload: Annotated[dict, Field(description="Service edit payload")],
+        service_id: Annotated[int, Field(ge=1, description="Service ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Service patchable fields:
+- service_ip: Service IP address
+- service_desc: Service description
+- service_param: Service check parameters
+- service_disabled: 0/1 to enable/disable
+- service_ignore: 0/1 to ignore in alerts"""
+            ),
+        ],
         ctx: Context = None,
     ) -> dict:
         """
@@ -2366,7 +2985,7 @@ def register_tools(mcp, config):
 
         Args:
             service_id (int): Service ID.
-            payload (dict): Service edit payload.
+            payload (dict): Fields to update.
 
         Returns:
             dict: The JSON response from the API.
@@ -2490,4 +3109,396 @@ def register_tools(mcp, config):
 
         except Exception as e:
             await ctx.error(f"Error system info: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "system", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def ping(ctx: Context = None) -> dict:
+        """
+        Simple API health check - ping LibreNMS API.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Pinging LibreNMS API...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get("ping")
+
+        except Exception as e:
+            await ctx.error(f"Error pinging API: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
+    # Additional Device Endpoints
+    ##########################
+    @mcp.tool(
+        tags={"librenms", "devices"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+        },
+    )
+    async def device_discover(
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Trigger device rediscovery in LibreNMS.
+
+        Args:
+            hostname (str): Device hostname or ID.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Triggering discovery for {hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.post(f"devices/{hostname}/discover")
+
+        except Exception as e:
+            await ctx.error(f"Error triggering discovery for {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "devices"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": True,
+        },
+    )
+    async def device_rename(
+        hostname: Annotated[str, Field(description="Current device hostname or ID")],
+        new_hostname: Annotated[str, Field(description="New hostname for the device")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Rename a device in LibreNMS.
+
+        Args:
+            hostname (str): Current device hostname or ID.
+            new_hostname (str): New hostname.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Renaming device {hostname} to {new_hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.patch(f"devices/{hostname}/rename/{new_hostname}")
+
+        except Exception as e:
+            await ctx.error(f"Error renaming device {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "devices", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def device_maintenance_status(
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Check if a device is currently in maintenance mode.
+
+        Args:
+            hostname (str): Device hostname or ID.
+
+        Returns:
+            dict: The JSON response with maintenance status.
+        """
+        try:
+            await ctx.info(f"Checking maintenance status for {hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get(f"devices/{hostname}/maintenance")
+
+        except Exception as e:
+            await ctx.error(f"Error checking maintenance status for {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "devices", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def device_vlans(
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Get VLANs configured on a specific device.
+
+        Args:
+            hostname (str): Device hostname or ID.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Getting VLANs for {hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get(f"devices/{hostname}/vlans")
+
+        except Exception as e:
+            await ctx.error(f"Error getting VLANs for {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "devices", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def device_links(
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Get network links for a specific device.
+
+        Args:
+            hostname (str): Device hostname or ID.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Getting links for {hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get(f"devices/{hostname}/links")
+
+        except Exception as e:
+            await ctx.error(f"Error getting links for {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "devices"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+        },
+    )
+    async def device_eventlog_add(
+        hostname: Annotated[str, Field(description="Device hostname or ID")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Event log entry payload:
+- message (required): Event message text
+- type (optional): Event type/category"""
+            ),
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Add a custom event log entry for a device.
+
+        Args:
+            hostname (str): Device hostname or ID.
+            payload (dict): Event log entry with message.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Adding event log entry for {hostname}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.post(f"devices/{hostname}/eventlog", data=payload)
+
+        except Exception as e:
+            await ctx.error(f"Error adding event log for {hostname}: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
+    # FDB (Forwarding Database)
+    ##########################
+    @mcp.tool(
+        tags={"librenms", "fdb", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def fdb_lookup(
+        mac: Annotated[
+            str,
+            Field(
+                description="MAC address to look up. Accepts multiple formats: aa:bb:cc:dd:ee:ff, aabb.ccdd.eeff, or aabbccddeeff"
+            ),
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Look up a MAC address in the forwarding database.
+
+        Args:
+            mac (str): MAC address in any common format.
+
+        Returns:
+            dict: The JSON response with FDB entries.
+        """
+        try:
+            await ctx.info(f"Looking up FDB entry for MAC {mac}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get(f"resources/fdb/{mac}")
+
+        except Exception as e:
+            await ctx.error(f"Error looking up FDB for {mac}: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
+    # OSPF
+    ##########################
+    @mcp.tool(
+        tags={"librenms", "routing", "ospf", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def ospf_list(ctx: Context = None) -> dict:
+        """
+        List all OSPF instances from LibreNMS.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Listing OSPF instances...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get("ospf")
+
+        except Exception as e:
+            await ctx.error(f"Error listing OSPF: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "routing", "ospf", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def ospf_ports(ctx: Context = None) -> dict:
+        """
+        List all OSPF ports/interfaces from LibreNMS.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Listing OSPF ports...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get("ospf_ports")
+
+        except Exception as e:
+            await ctx.error(f"Error listing OSPF ports: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
+    # VRF
+    ##########################
+    @mcp.tool(
+        tags={"librenms", "routing", "vrf", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def vrf_list(ctx: Context = None) -> dict:
+        """
+        List all VRF (Virtual Routing and Forwarding) instances from LibreNMS.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Listing VRF instances...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get("routing/vrf")
+
+        except Exception as e:
+            await ctx.error(f"Error listing VRF: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
+    # Location Maintenance
+    ##########################
+    @mcp.tool(
+        tags={"librenms", "locations"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def location_set_maintenance(
+        location: Annotated[str, Field(description="Location identifier or name")],
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Maintenance mode payload:
+- duration (required): Duration in "H:i" format (e.g., "02:00" for 2 hours)
+- title (optional): Maintenance window title
+- notes (optional): Maintenance notes
+- start (optional): Start time in "Y-m-d H:i:00" format (default: now)"""
+            ),
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Set maintenance mode for all devices in a location.
+
+        Args:
+            location (str): Location identifier or name.
+            payload (dict): Maintenance payload with duration.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Setting maintenance for location {location}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.post(
+                    f"locations/{location}/maintenance", data=payload
+                )
+
+        except Exception as e:
+            await ctx.error(f"Error setting maintenance for location {location}: {e!s}")
             return {"error": str(e)}

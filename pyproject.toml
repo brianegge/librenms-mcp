@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "librenms-mcp"
-version = "1.4.0"
+version = "1.5.0"
 description = "MCP server for LibreNMS management"
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
@@ -134,15 +134,6 @@ name = "cz_conventional_commits"
 tag_format = "v$version"
 version_scheme = "pep440"
 version_provider = "uv"
+version_files = ["server.json"]
 update_changelog_on_bump = true
 major_version_zero = true
-
-[[tool.commitizen.update_major_version_patterns]]
-files = ["server.json"]
-pattern = "\"version\": \"{current_version}\""
-replace = "\"version\": \"{new_version}\""
-
-[[tool.commitizen.update_major_version_patterns]]
-files = ["server.json"]
-pattern = "ghcr.io/mhajder/librenms-mcp:{current_version}"
-replace = "ghcr.io/mhajder/librenms-mcp:{new_version}"

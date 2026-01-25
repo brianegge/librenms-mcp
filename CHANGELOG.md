@@ -1,3 +1,15 @@
+## v1.5.0 (2026-01-25)
+
+### Feat
+
+- add MCP Registry integration and metadata
+- improve tool descriptions and add missing API endpoints (#1)
+- add Python 3.14 support
+
+### Fix
+
+- **docker**: improve healthcheck configuration
+
 ## v1.4.0 (2025-12-22)
 
 ### Feat

@@ -1292,6 +1292,7 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
 - poller_group: Poller group ID
 - ignore: 0/1 to ignore device in alerts
 - disabled: 0/1 to disable polling
+- snmp_disable: 0/1 to disable SNMP polling
 - display: Custom display name
 - type: Device type classification"""
             ),
@@ -1312,7 +1313,7 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             await ctx.info(f"Updating device {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"devices/{hostname}", data=payload)
+                return await client.patch(f"devices/{hostname}", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error updating device {hostname}: {e!s}")

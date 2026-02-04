@@ -3550,9 +3550,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
         hostname: Annotated[str, Field(description="Device hostname or ID")],
         type: Annotated[
             str,
-            Field(
-                description="Sensor type (e.g. temperature, voltage, fanspeed)"
-            ),
+            Field(description="Sensor type (e.g. temperature, voltage, fanspeed)"),
         ],
         ctx: Context = None,
     ) -> dict:
@@ -3575,9 +3573,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
                 )
 
         except Exception as e:
-            await ctx.error(
-                f"Error getting {type} health data for {hostname}: {e!s}"
-            )
+            await ctx.error(f"Error getting {type} health data for {hostname}: {e!s}")
             return {"error": str(e)}
 
     @mcp.tool(
@@ -3592,9 +3588,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
         hostname: Annotated[str, Field(description="Device hostname or ID")],
         type: Annotated[
             str,
-            Field(
-                description="Sensor type (e.g. temperature, voltage, fanspeed)"
-            ),
+            Field(description="Sensor type (e.g. temperature, voltage, fanspeed)"),
         ],
         sensor_id: Annotated[int, Field(ge=1, description="Sensor ID")],
         ctx: Context = None,
@@ -3611,9 +3605,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
             dict: The JSON response from the API.
         """
         try:
-            await ctx.info(
-                f"Getting sensor {sensor_id} ({type}) for {hostname}..."
-            )
+            await ctx.info(f"Getting sensor {sensor_id} ({type}) for {hostname}...")
 
             async with LibreNMSClient(config) as client:
                 return await client.get(

@@ -3165,7 +3165,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
             await ctx.info(f"Triggering discovery for {hostname}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.post(f"devices/{hostname}/discover")
+                return await client.get(f"devices/{hostname}/discover")
 
         except Exception as e:
             await ctx.error(f"Error triggering discovery for {hostname}: {e!s}")

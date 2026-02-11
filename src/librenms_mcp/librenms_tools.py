@@ -399,6 +399,185 @@ Example:
             return {"error": str(e)}
 
     ##########################
+    # Alert Templates
+    ##########################
+
+    @mcp.tool(
+        tags={"librenms", "alert-templates", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def alert_templates_list(ctx: Context = None) -> dict:
+        """
+        List all alert templates from LibreNMS.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Listing all alert templates...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get("templates")
+
+        except Exception as e:
+            await ctx.error(f"Error listing alert templates: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "alert-templates", "read-only"},
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+        },
+    )
+    async def alert_template_get(
+        template_id: Annotated[int, Field(ge=1, description="Alert template ID")],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Get a specific alert template from LibreNMS by ID.
+
+        Args:
+            template_id (int): Alert template ID.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Getting alert template {template_id}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.get(f"templates/{template_id}")
+
+        except Exception as e:
+            await ctx.error(f"Error getting alert template {template_id}: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "alert-templates"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+        },
+    )
+    async def alert_template_create(
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Alert template payload fields:
+- name (required): Template name
+- template (required): Template body (Laravel Blade syntax)
+- title (optional): Alert title template
+- title_rec (optional): Recovery title template
+- rules (optional): Array of alert rule IDs to associate with this template
+
+Example:
+{"name": "Custom Alert", "template": "{{ $alert->title }}\\nSeverity: {{ $alert->severity }}", "title": "Alert: {{ $alert->title }}"}"""
+            ),
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Create a new alert template in LibreNMS.
+
+        Args:
+            payload (dict): Alert template definition with name and template body.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info("Creating new alert template...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.post("templates", data=payload)
+
+        except Exception as e:
+            await ctx.error(f"Error creating alert template: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "alert-templates"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": True,
+        },
+    )
+    async def alert_template_edit(
+        payload: Annotated[
+            dict,
+            Field(
+                description="""Alert template edit payload (must include id field):
+- id (required): Template ID to edit
+- name: Template name
+- template: Template body (Laravel Blade syntax)
+- title: Alert title template
+- title_rec: Recovery title template
+- rules: Array of alert rule IDs to associate with this template"""
+            ),
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Edit an existing alert template in LibreNMS.
+
+        Args:
+            payload (dict): Alert template payload with id and fields to update.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Editing alert template {payload.get('id')}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.put("templates", data=payload)
+
+        except Exception as e:
+            await ctx.error(f"Error editing alert template: {e!s}")
+            return {"error": str(e)}
+
+    @mcp.tool(
+        tags={"librenms", "alert-templates"},
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": True,
+        },
+    )
+    async def alert_template_delete(
+        template_id: Annotated[
+            int, Field(ge=1, description="Alert template ID to delete")
+        ],
+        ctx: Context = None,
+    ) -> dict:
+        """
+        Delete an alert template from LibreNMS by ID.
+
+        Args:
+            template_id (int): Alert template ID to delete.
+
+        Returns:
+            dict: The JSON response from the API.
+        """
+        try:
+            await ctx.info(f"Deleting alert template {template_id}...")
+
+            async with LibreNMSClient(config) as client:
+                return await client.delete(f"templates/{template_id}")
+
+        except Exception as e:
+            await ctx.error(f"Error deleting alert template {template_id}: {e!s}")
+            return {"error": str(e)}
+
+    ##########################
     # ARP
     ##########################
 

@@ -1491,8 +1491,16 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
         try:
             await ctx.info(f"Updating device {hostname}...")
 
+            # LibreNMS API expects "field" and "data" keys
+            fields = list(payload.keys())
+            values = list(payload.values())
+            if len(fields) == 1:
+                api_payload = {"field": fields[0], "data": values[0]}
+            else:
+                api_payload = {"field": fields, "data": values}
+
             async with LibreNMSClient(config) as client:
-                return await client.patch(f"devices/{hostname}", data=payload)
+                return await client.patch(f"devices/{hostname}", data=api_payload)
 
         except Exception as e:
             await ctx.error(f"Error updating device {hostname}: {e!s}")

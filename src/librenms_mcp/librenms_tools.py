@@ -1084,7 +1084,7 @@ Example dynamic group:
             await ctx.info(f"Updating device group {name}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"devicegroups/{name}", data=payload)
+                return await client.patch(f"devicegroups/{name}", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error updating device group {name}: {e!s}")
@@ -1280,9 +1280,7 @@ Example dynamic group:
             await ctx.info(f"Removing devices from group {name}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.delete(
-                    f"devicegroups/{name}/devices", params=payload
-                )
+                return await client.delete(f"devicegroups/{name}/devices", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error removing devices from group {name}: {e!s}")
@@ -1871,7 +1869,7 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             await ctx.info(f"Deleting location {location}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.delete(f"locations/{location}")
+                return await client.delete(f"locations/{quote(location, safe='')}")
 
         except Exception as e:
             await ctx.error(f"Error deleting location {location}: {e!s}")
@@ -1911,7 +1909,9 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             await ctx.info(f"Editing location {location}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"locations/{location}", data=payload)
+                return await client.patch(
+                    f"locations/{quote(location, safe='')}", data=payload
+                )
 
         except Exception as e:
             await ctx.error(f"Error editing location {location}: {e!s}")
@@ -1941,7 +1941,7 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             await ctx.info(f"Getting location {location}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.get(f"location/{location}")
+                return await client.get(f"location/{quote(location, safe='')}")
 
         except Exception as e:
             await ctx.error(f"Error getting location {location}: {e!s}")
@@ -2187,7 +2187,6 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
         },
     )
     async def logs_authlog(
-        hostname: Annotated[str, Field(description="Device hostname or ID")],
         start: Annotated[
             int | None,
             Field(default=None, description="Page number for pagination"),
@@ -2243,15 +2242,15 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             params["sortorder"] = sortorder
 
         try:
-            await ctx.info(f"Getting auth logs for {hostname}...")
+            await ctx.info("Getting auth logs ...")
 
             async with LibreNMSClient(config) as client:
                 return await client.get(
-                    f"logs/authlog/{hostname}", params=params if params else None
+                    "logs/authlog", params=params if params else None
                 )
 
         except Exception as e:
-            await ctx.error(f"Error authlog {hostname}: {e!s}")
+            await ctx.error(f"Error authlog: {e!s}")
             return {"error": str(e)}
 
     @mcp.tool(
@@ -2264,9 +2263,9 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
     )
     async def logs_syslogsink(
         payload: Annotated[
-            dict,
+            dict[str, Any] | list[dict[str, Any]],
             Field(
-                description="JSON syslog message to ingest into LibreNMS syslog storage"
+                description="JSON syslog message(s) to ingest into LibreNMS syslog storage. Accepts a single object or an array of objects."
             ),
         ],
         ctx: Context = None,
@@ -2284,7 +2283,7 @@ Valid type values: all, active, ignored, up, down, disabled, os, mac, ipv4, ipv6
             await ctx.info("Adding syslog sink...")
 
             async with LibreNMSClient(config) as client:
-                return await client.post("logs/syslogsink", data=payload)
+                return await client.post("syslogsink", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error syslogsink: {e!s}")
@@ -2805,7 +2804,7 @@ Available columns: port_id, device_id, ifDescr, ifName, ifAlias, ifType, ifSpeed
             await ctx.info(f"Updating port description {port_id}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"ports/{port_id}/description", data=payload)
+                return await client.patch(f"ports/{port_id}/description", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error updating description {port_id}: {e!s}")
@@ -3182,7 +3181,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
             await ctx.info(f"Editing service {service_id}...")
 
             async with LibreNMSClient(config) as client:
-                return await client.put(f"services/{service_id}", data=payload)
+                return await client.patch(f"services/{service_id}", data=payload)
 
         except Exception as e:
             await ctx.error(f"Error editing service {service_id}: {e!s}")
@@ -3498,8 +3497,9 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
             dict,
             Field(
                 description="""Event log entry payload:
-- message (required): Event message text
-- type (optional): Event type/category"""
+- text (required): Event message text
+- type (optional): Event type/category
+- severity (optional): Severity level (1-5)"""
             ),
         ],
         ctx: Context = None,
@@ -3684,7 +3684,7 @@ Example: {"type": "http", "desc": "Web Server", "param": "-p 8080 -u /health"}""
 
             async with LibreNMSClient(config) as client:
                 return await client.post(
-                    f"locations/{location}/maintenance", data=payload
+                    f"locations/{quote(location, safe='')}/maintenance", data=payload
                 )
 
         except Exception as e:
